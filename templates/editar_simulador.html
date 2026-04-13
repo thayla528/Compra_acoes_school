@@ -38,8 +38,8 @@ button.bg-gradient-pink-red {
         <label class="block mb-2 font-bold">Tipo</label>
         <select name="tipo" class="w-full input-precision mb-4" required>
             <option value="CDI"> {% if investimento.tipo == 'CDI' %}selected{% endif %}>CDI</option>
-            <option value="LCI"> {% if investimento.tipo == 'LCI' %}selected{% endif %}>LCI</option>
-            <option value="LCA"> {% if investimento.tipo == 'LCA' %}selected{% endif %}>LCA</option>
+            <option value="LCI" >{% if investimento.tipo == 'LCI' %}selected{% endif %}>LCI</option>
+            <option value="LCA" >{% if investimento.tipo == 'LCA' %}selected{% endif %}>LCA</option>
             <option value="SELIC"> {% if investimento.tipo == 'SELIC' %}selected{% endif %}>SELIC</option>
         </select>
 
