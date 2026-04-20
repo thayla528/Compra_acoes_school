@@ -164,30 +164,48 @@ def cadastrar_empresa():
     return redirect(url_for("perfil.perfil"))
 
 
-# ------------------ BUSCAR AÇÃO (API) ------------------
+
+
+@login_required
 @empresas_bp.route("/buscar_acao/<ticker>")
 @login_required
 def buscar_acao(ticker):
-
     try:
         ticker = ticker.strip().upper()
+        acao = yf.Ticker(f"{ticker}.SA")
+        info = acao.info
 
-        dados = yf.Ticker(f"{ticker}.SA")
-        info = dados.info
-
-        if not info or "shortName" not in info:
+        if not info or ("shortName" not in info and "longName" not in info):
             return jsonify({"erro": "Ativo não encontrado"})
 
+        # Pegando dados do Balanço e DRE (mais confiável que o .info)
+        # .iloc[:, 0] pega o dado do ano/trimestre mais recente
+        try:
+            balanco = acao.balance_sheet.iloc[:, 0]
+            dre = acao.financials.iloc[:, 0]
+
+            lucro_liquido = float(dre.get('Net Income', 0))
+            patrimonio = float(balanco.get('Stockholders Equity', 0))
+            ativos = float(balanco.get('Total Assets', 0))
+            divida = float(balanco.get('Total Debt', 0))
+        except:
+            # Fallback caso o balance_sheet falhe
+            lucro_liquido = info.get("netIncomeToCommon", 0)
+            patrimonio = info.get("totalStockholderEquity", 0) or (
+                        info.get("bookValue", 0) * info.get("sharesOutstanding", 1))
+            ativos = info.get("totalAssets", 0)
+            divida = info.get("totalDebt", 0)
+
         return jsonify({
-            "nome": info.get("shortName"),
+            "nome": info.get("shortName") or info.get("longName"),
             "setor": info.get("sector"),
-            "preco": info.get("regularMarketPrice"),
-            "lucro_liquido": info.get("netIncomeToCommon"),
-            "patrimonio": info.get("bookValue"),
-            "ativos": info.get("totalAssets"),
-            "divida": info.get("totalDebt")
+            "preco": info.get("currentPrice") or info.get("regularMarketPrice"),
+            "lucro_liquido": lucro_liquido,
+            "patrimonio": patrimonio,
+            "ativos": ativos,
+            "divida": divida
         })
 
     except Exception as e:
-        print("ERRO BUSCAR AÇÃO:", e)
+        print(f"ERRO BUSCAR AÇÃO {ticker}: {e}")
         return jsonify({"erro": "Falha ao buscar dados"})

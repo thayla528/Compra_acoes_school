@@ -12,9 +12,6 @@ perfil_bp = Blueprint("perfil", __name__)
 @perfil_bp.route("/perfil")
 @login_required
 def perfil():
-    if "usuario_id" not in session:
-        return redirect(url_for("auth.login"))
-
     conn = conectar()
     cursor = conn.cursor()
 
@@ -45,13 +42,16 @@ def perfil():
 
         empresas_atualizadas.append(empresa)
 
+    # 🔥 FOTO DO USUÁRIO AQUI
+    foto_path = f"perfil/{session['usuario_id']}.png"
+
     conn.close()
 
     return render_template(
         "perfil.html",
         usuario=session["usuario_nome"],
         empresas=empresas_atualizadas,
-        os=os
+        foto_path=foto_path
     )
 
 
@@ -59,9 +59,6 @@ def perfil():
 @perfil_bp.route("/upload_foto", methods=["POST"])
 @login_required
 def upload_foto():
-    if "usuario_id" not in session:
-        return redirect(url_for("auth.login"))
-
     if "foto" not in request.files:
         flash("Nenhum arquivo enviado!", "danger")
         return redirect(url_for("perfil.perfil"))
@@ -72,10 +69,27 @@ def upload_foto():
         flash("Nenhum arquivo selecionado!", "warning")
         return redirect(url_for("perfil.perfil"))
 
-    filename = str(session["usuario_id"]) + ".png"
-    caminho = os.path.join("static/perfil", filename)
+    # extensão original
+    ext = os.path.splitext(foto.filename)[1].lower()
 
-    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+    # validação básica
+    if ext not in [".png", ".jpg", ".jpeg", ".webp"]:
+        flash("Formato não permitido!", "danger")
+        return redirect(url_for("perfil.perfil"))
+
+    # 🔥 nome fixo por usuário
+    filename = f"{session['usuario_id']}.png"
+    pasta = os.path.join("static", "perfil")
+    caminho = os.path.join(pasta, filename)
+
+    os.makedirs(pasta, exist_ok=True)
+    foto.save(caminho)
+
+    # 🔥 caminho FINAL obrigatório
+    pasta = os.path.join("static", "perfil")
+    caminho = os.path.join(pasta, filename)
+
+    os.makedirs(pasta, exist_ok=True)
     foto.save(caminho)
 
     flash("Foto atualizada com sucesso!", "success")

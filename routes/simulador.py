@@ -2,8 +2,107 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from database.banco import conectar
 from routes.auth import login_required
 from services.calculos import calcular_lucro
+import yfinance as yf
 
 simulador_bp = Blueprint("simulador", __name__)
+
+
+# ------------------ TAXA AUTOMÁTICA ------------------
+@simulador_bp.route("/buscar_ativo/<ticker>")
+@login_required
+def buscar_ativo(ticker):
+    try:
+        acao = yf.Ticker(ticker)
+        hist = acao.history(period="1d")
+
+        info = acao.info
+
+        if hist.empty:
+            return {"erro": True}
+
+        preco = hist["Close"].iloc[-1]
+
+        return {
+            "erro": False,
+            "preco": round(preco, 2),
+            "nome": info.get("shortName", ticker)
+        }
+
+    except:
+        return {"erro": True}
+
+# ------------------ TAXA AUTOMÁTICA ------------------
+
+def taxa_automatica(tipo):
+    try:
+        ativo = yf.Ticker(tipo)
+        hist = ativo.history(period="1y")
+
+        if hist.empty:
+            return 0.10  # CDI padrão
+
+        inicio = hist["Close"].iloc[0]
+        fim = hist["Close"].iloc[-1]
+
+        retorno = (fim - inicio) / inicio
+
+        # trava de segurança
+        retorno = max(min(retorno, 1), -0.5)
+
+        return retorno
+
+    except:
+        return 0.10
+
+# ------------------ EDITAR ------------------
+@simulador_bp.route("/editar_simulador/<int:id>", methods=["GET", "POST"])
+@login_required
+def editar_simulador(id):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM investimentos WHERE id = ? AND usuario_id = ?",
+        (id, session["usuario_id"])
+    )
+    investimento = cursor.fetchone()
+
+    if not investimento:
+        flash("Investimento não encontrado!", "danger")
+        return redirect(url_for("simulador.investimentos"))
+
+    if request.method == "POST":
+        tipo = request.form.get('tipo')
+        valor = float(request.form.get('valor_investido', 0))
+
+        # 🔥 AGORA AUTOMÁTICO
+        taxa = taxa_automatica(tipo)
+
+        tempo = int(request.form.get('tempo', 0))
+        tipo_tempo = request.form.get('tipo_tempo')  # "meses" ou "anos"
+
+        if tipo_tempo == "anos":
+            tempo = tempo * 12
+
+        lucro = calcular_lucro(valor, taxa * 100, tempo)
+
+        cursor.execute("""
+            UPDATE investimentos
+            SET tipo=?, valor_investido=?, taxa=?, tempo=?, lucro=?
+            WHERE id=? AND usuario_id=?
+        """, (
+            tipo, valor, taxa * 100, tempo, lucro,
+            id, session["usuario_id"]
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Investimento atualizado!", "success")
+        return redirect(url_for("simulador.investimentos"))
+
+    conn.close()
+    return render_template("editar_simulador.html", investimento=investimento)
 
 
 # ------------------ EXCLUIR ------------------
@@ -41,10 +140,12 @@ def investimentos():
     if request.method == 'POST':
         tipo = request.form.get('tipo')
         valor = float(request.form.get('valor_investido', 0))
-        taxa = float(request.form.get('taxa', 0))
         tempo = int(request.form.get('tempo', 0))
 
-        lucro = calcular_lucro(valor, taxa, tempo)
+        # 🔥 TAXA AUTOMÁTICA DO MERCADO
+        taxa = taxa_automatica(tipo)
+
+        lucro = calcular_lucro(valor, taxa * 100, tempo)
 
         cursor.execute("""
             INSERT INTO investimentos (
@@ -53,7 +154,7 @@ def investimentos():
             VALUES (?, ?, ?, ?, ?, ?)
         """, (
             session['usuario_id'],
-            tipo, valor, taxa, tempo, lucro
+            tipo, valor, taxa * 100, tempo, lucro
         ))
 
         conn.commit()

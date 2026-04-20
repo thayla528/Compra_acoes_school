@@ -73,13 +73,20 @@ body {
         </div>
 
         <!-- PERFIL -->
+        <!-- PERFIL -->
         <div class="flex items-center gap-6 p-4 glass-card rounded-xl">
             <div class="relative group">
 
-                {% if os.path.exists('static/perfil/' + usuario + '.png') %}
-                    <img src="{{ url_for('static', filename='perfil/' + usuario + '.png') }}"
+                {% if foto_path %}
+                    <img src="{{ url_for('static', filename=foto_path) }}"
                          class="w-20 h-20 rounded-lg object-cover border-2"
                          style="border-color: var(--pink-text)">
+
+                {% elif usuario %}
+                    <img src="{{ url_for('static', filename='perfil/' ~ usuario ~ '.png') }}"
+                         class="w-20 h-20 rounded-lg object-cover border-2"
+                         style="border-color: var(--pink-text)">
+
                 {% else %}
                     <div class="w-20 h-20 rounded-lg bg-zinc-900 flex items-center justify-center border-2 border-dashed border-white/10">
                         <span class="material-symbols-outlined text-3xl text-white/20">person</span>
