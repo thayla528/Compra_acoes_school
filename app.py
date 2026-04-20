@@ -5,6 +5,8 @@ import pandas as pd
 import sys
 print(sys.executable)
 
+
+
 from routes.auth import auth_bp
 from routes.empresas import empresas_bp
 from services.yfinance_service import yfinance_bp
